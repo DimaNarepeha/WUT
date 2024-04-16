@@ -1,9 +1,8 @@
 import numpy as np
-import tensorboard as t
+import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter()
-BATCH_SIZE = 32
 
 
 def sigmoid(x):
@@ -14,63 +13,104 @@ def sigmoid_derivative(x):
     return x * (1 - x)
 
 
+def tanh(x):
+    return np.tanh(x)
+
+
+def tanh_derivative(x):
+    return 1 - np.tanh(x) ** 2
+
+
 def mse_loss(y_true, y_pred):
     return ((y_true - y_pred) ** 2).mean()
 
 
 class MLP:
-    def __init__(self, input_size, hidden_size, output_size):
-        self.weights1 = np.random.rand(input_size, hidden_size)
-        self.bias1 = np.zeros((1, hidden_size))
-        self.weights2 = np.random.rand(hidden_size, output_size)
-        self.bias2 = np.zeros((1, output_size))
+    def __init__(self, layers, activation='sigmoid'):
+        self.layers = layers
+        self.activation = sigmoid if activation == 'sigmoid' else tanh
+        self.activation_derivative = sigmoid_derivative if activation == 'sigmoid' else tanh_derivative
+        self.weights = []
+        self.biases = []
+        self.velocity_w = []  # for momentum
+        self.velocity_b = []  # for momentum
+
+        # Initialize weights and biases with Xavier/Glorot initialization for tanh (or He initialization)
+        for i in range(len(layers) - 1):
+            stddev = np.sqrt(2 / (layers[i] + layers[i + 1])) if activation == 'tanh' else np.sqrt(1 / layers[i])
+            self.weights.append(np.random.normal(0, stddev, (layers[i], layers[i + 1])))
+            self.biases.append(np.zeros((1, layers[i + 1])))
+            self.velocity_w.append(np.zeros((layers[i], layers[i + 1])))
+            self.velocity_b.append(np.zeros((1, layers[i + 1])))
+
+    def backpropagation(self, X, y, learning_rate, momentum):
+        output_error = y - self.activations[-1]
+        deltas = [output_error * self.activation_derivative(self.activations[-1])]
+
+        for i in reversed(range(len(self.activations) - 2)):
+            error = deltas[-1].dot(self.weights[i + 1].T)
+            delta = error * self.activation_derivative(self.activations[i + 1])
+            deltas.append(delta)
+
+        deltas.reverse()
+
+        for i in range(len(self.weights)):
+            weight_gradient = self.activations[i].T.dot(deltas[i])
+            bias_gradient = np.sum(deltas[i], axis=0, keepdims=True)
+
+            self.velocity_w[i] = momentum * self.velocity_w[i] + learning_rate * weight_gradient
+            self.velocity_b[i] = momentum * self.velocity_b[i] + learning_rate * bias_gradient
+
+            self.weights[i] += self.velocity_w[i]
+            self.biases[i] += self.velocity_b[i]
 
     def forward_pass(self, X):
-        self.hidden = sigmoid(np.dot(X, self.weights1) + self.bias1)
-        self.output = sigmoid(np.dot(self.hidden, self.weights2) + self.bias2)
-        return self.output
+        self.activations = [X]
+        for i in range(len(self.weights)):
+            net = np.dot(self.activations[-1], self.weights[i]) + self.biases[i]
+            self.activations.append(self.activation(net))
+        return self.activations[-1]
 
-    def backpropagation(self, X, y):
-        learning_rate = 0.01
-
-        output_error = y - self.output
-        output_delta = output_error * sigmoid_derivative(self.output)
-
-        hidden_error = output_delta.dot(self.weights2.T)
-        hidden_delta = hidden_error * sigmoid_derivative(self.hidden)
-
-        # Update the weights and biases
-        self.weights2 += self.hidden.T.dot(output_delta) * learning_rate
-        self.bias2 += np.sum(output_delta, axis=0, keepdims=True) * learning_rate
-        self.weights1 += X.T.dot(hidden_delta) * learning_rate
-        self.bias1 += np.sum(hidden_delta, axis=0, keepdims=True) * learning_rate
-
-    def train(self, X, y, epochs=1000):
+    def train(self, X, y, epochs, batch_size, learning_rate, momentum):
+        loss_history = []
         for epoch in range(epochs):
             total_loss = 0
-            # Mini-batch training
-            for i in range(0, X.shape[0], BATCH_SIZE):
-                X_batch = X[i:i + BATCH_SIZE]
-                y_batch = y[i:i + BATCH_SIZE]
+            for i in range(0, X.shape[0], batch_size):
+                X_batch = X[i:i + batch_size]
+                y_batch = y[i:i + batch_size]
 
                 self.forward_pass(X_batch)
-                self.backpropagation(X_batch, y_batch)
-                total_loss += mse_loss(y_batch, self.output)
+                self.backpropagation(X_batch, y_batch, learning_rate, momentum)
+                total_loss += mse_loss(y_batch, self.activations[-1])
 
-            average_loss = total_loss / (X.shape[0] / BATCH_SIZE)
-            if epoch % 100 == 0:
-                writer.add_scalar('loss', average_loss, epoch)
-                print(f"Epoch {epoch}, Loss: {average_loss}")
-
-    def predict(self, X):
-        output = self.forward_pass(X)
-        return np.argmax(output, axis=1)
+            average_loss = total_loss / (X.shape[0] / batch_size)
+            loss_history.append(average_loss)
+            writer.add_scalar('loss', average_loss, epoch)
+            print(f"Epoch {epoch}, Loss: {average_loss}")
+        return loss_history
 
     def evaluate(self, X, y):
-        predictions = self.predict(X)
+        output = self.forward_pass(X)
+        predictions = np.argmax(output, axis=1)
         actual_classes = np.argmax(y, axis=1)
         accuracy = np.mean(predictions == actual_classes)
         return accuracy
+
+
+# # User inputs
+# hidden_layers = int(input("Enter number of hidden layers: "))
+
+# activation = input("Enter activation function (sigmoid/tanh): ")
+# epochs = int(input("Enter number of epochs: "))
+# batch_size = int(input("Enter batch size: "))
+# learning_rate = float(input("Enter learning rate: "))
+# momentum = float(input("Enter momentum: "))
+
+activation = 'sigmoid'
+epochs = 1000
+batch_size = 32
+learning_rate = 0.005
+momentum = 0.2
 
 
 def load_iris_dataset(file_path):
@@ -107,15 +147,86 @@ def one_hot_encode(labels):
     return one_hot
 
 
-file_path = 'data/iris.data'  # Update with the actual path to your data file
-features, labels = load_iris_dataset(file_path)
+def load_wine_dataset(file_path):
+    features = []
+    labels = []
+
+    # Open and read the dataset file
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line == '\n':
+                continue
+            # Wine dataset usually starts with the label followed by features
+            parts = line.strip().split(',')
+            labels.append(int(parts[0]))  # Assuming the first column is the label
+            features.append([float(part) for part in parts[1:]])
+
+    features_np = np.array(features)
+    labels_np = np.array(labels).reshape(-1, 1)
+
+    return features_np, labels_np
+
+
+features, labels = None, None
+file_path = 'data/iris.data'
+# Ask the user which dataset to load
+dataset_choice = input("Type 'iris' to load the Iris dataset or 'wine' to load the Wine dataset: ").lower().strip()
+
+if dataset_choice == "iris":
+    file_path = 'data/iris.data'  # Update this path to your Iris dataset location
+    features, labels = load_iris_dataset(file_path)
+    print("Loaded Iris dataset.")
+elif dataset_choice == "wine":
+    file_path = 'data/wine.csv'  # Update this path to your Wine dataset location
+    features, labels = load_wine_dataset(file_path)
+    print("Loaded Wine dataset.")
+else:
+    raise ValueError("Invalid dataset choice. Please type 'iris' or 'wine'.")
 
 labels_onehot = one_hot_encode(labels)
+input_size = 0
+output_size = 0
 
-# TRAINING
-mlp = MLP(input_size=4, hidden_size=4, output_size=3)
-mlp.train(features, labels_onehot, epochs=100000)
+if dataset_choice == "iris":
+    input_size = 4
+    output_size = 3
+elif dataset_choice == "wine":
+    input_size = 13
+    output_size = 4 #even though we have 3 classes our one hot is output 4 shape
+else:
+    raise ValueError("Invalid dataset choice. Please type 'iris' or 'wine'.")
 
-# TESTING
-accuracy = mlp.evaluate(features, labels_onehot)  # Make sure you've defined X_test and y_test_onehot
+hidden_layers = 2
+layers = [input_size]  # Input size for Iris/wine dataset
+for i in range(hidden_layers):
+    # layers.append(int(input(f"Enter number of neurons in hidden layer {i + 1}: ")))
+    layers.append(70)
+layers.append(output_size)  # Output size for Iris/wine dataset
+#
+
+
+#
+# Initialize the MLP with user-defined settings
+mlp = MLP(layers=layers, activation=activation)
+
+# Training the model
+print("Starting training...")
+training_loss = mlp.train(features, labels_onehot, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate,
+                          momentum=momentum)
+
+# Plotting training loss
+plt.figure(figsize=(10, 5))
+plt.plot(training_loss, label='Training Loss')
+plt.title('Training Loss Over Epochs')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Evaluate the trained model
+accuracy = mlp.evaluate(features, labels_onehot)
 print(f"Test Accuracy: {accuracy * 100:.2f}%")
+
+# Closing the SummaryWriter for TensorBoard
+writer.close()
