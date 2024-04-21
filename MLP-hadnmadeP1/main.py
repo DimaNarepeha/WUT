@@ -6,7 +6,10 @@ writer = SummaryWriter()
 
 
 def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+    return np.where(x >= 0,
+                    1 / (1 + np.exp(-x)),
+                    np.exp(x) / (1 + np.exp(x)))
+
 
 
 def sigmoid_derivative(x):
@@ -182,7 +185,14 @@ def load_wine_dataset(file_path):
     features_np = np.array(features)
     labels_np = np.array(labels).reshape(-1, 1)
 
-    return features_np, labels_np
+    # Calculate mean and std dev for each feature
+    means = np.mean(features_np, axis=0)
+    std_devs = np.std(features_np, axis=0)
+
+    # Normalize features
+    normalized_features = (features - means) / std_devs
+
+    return normalized_features, labels_np
 
 
 features, labels = None, None
