@@ -225,7 +225,6 @@ layers.append(output_size)  # Output size for Iris/wine dataset
 #
 # Initialize the MLP with user-defined settings
 mlp = MLP(layers=layers, activation=activation)
-print(f"the input feature shape is {features.shape}, the label shape is {labels_onehot.shape}")
 # Training the model
 print("Starting training...")
 training_loss = mlp.train(features, labels_onehot, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate,
