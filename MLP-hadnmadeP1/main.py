@@ -97,20 +97,38 @@ class MLP:
         return accuracy
 
 
-# # User inputs
-# hidden_layers = int(input("Enter number of hidden layers: "))
+def get_positive_integer(prompt):
+    """ Utility function to get a positive integer from the user. """
+    while True:
+        try:
+            value = int(input(prompt))
+            if value < 1:
+                print("Please enter a positive integer.")
+            else:
+                return value
+        except ValueError:
+            print("Invalid input; please enter an integer.")
 
-# activation = input("Enter activation function (sigmoid/tanh): ")
-# epochs = int(input("Enter number of epochs: "))
-# batch_size = int(input("Enter batch size: "))
-# learning_rate = float(input("Enter learning rate: "))
-# momentum = float(input("Enter momentum: "))
+# User inputs
+hidden_layers = get_positive_integer("Enter number of hidden layers: ")
+neurons_per_layer = []
+# Ask the user for the number of neurons in each layer
+for i in range(1, hidden_layers + 1):
+    prompt = f"Enter the number of neurons for hidden layer {i}: "
+    neurons = get_positive_integer(prompt)
+    neurons_per_layer.append(neurons)
 
-activation = 'sigmoid'
-epochs = 1000
-batch_size = 32
-learning_rate = 0.005
-momentum = 0.2
+activation = input("Enter activation function (sigmoid/tanh): ")
+epochs = int(input("Enter number of epochs: "))
+batch_size = int(input("Enter batch size: "))
+learning_rate = float(input("Enter learning rate: "))
+momentum = float(input("Enter momentum: "))
+
+#activation = 'sigmoid'
+#epochs = 200
+#batch_size = 32
+#learning_rate = 0.005
+#momentum = 0.2
 
 
 def load_iris_dataset(file_path):
@@ -198,9 +216,8 @@ else:
 
 hidden_layers = 2
 layers = [input_size]  # Input size for Iris/wine dataset
-for i in range(hidden_layers):
-    # layers.append(int(input(f"Enter number of neurons in hidden layer {i + 1}: ")))
-    layers.append(70)
+for n_n in neurons_per_layer:
+    layers.append(n_n)
 layers.append(output_size)  # Output size for Iris/wine dataset
 #
 
@@ -208,7 +225,6 @@ layers.append(output_size)  # Output size for Iris/wine dataset
 #
 # Initialize the MLP with user-defined settings
 mlp = MLP(layers=layers, activation=activation)
-
 # Training the model
 print("Starting training...")
 training_loss = mlp.train(features, labels_onehot, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate,
