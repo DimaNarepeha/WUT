@@ -1,0 +1,13 @@
+\contentsline {section}{\numberline {1}Theoretical description}{2}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Introduction}{2}{subsection.1.1}%
+\contentsline {subsubsection}{\numberline {1.1.1}Task description}{2}{subsubsection.1.1.1}%
+\contentsline {subsection}{\numberline {1.2}Action description language}{2}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {1.2.1}Syntax}{3}{subsubsection.1.2.1}%
+\contentsline {subsubsection}{\numberline {1.2.2}Semantics}{3}{subsubsection.1.2.2}%
+\contentsline {subsection}{\numberline {1.3}Query Language}{4}{subsection.1.3}%
+\contentsline {subsubsection}{\numberline {1.3.1}Query statements}{4}{subsubsection.1.3.1}%
+\contentsline {subsubsection}{\numberline {1.3.2}Satisfiability of queries}{5}{subsubsection.1.3.2}%
+\contentsline {section}{\numberline {2}Examples of dynamic systems}{5}{section.2}%
+\contentsline {subsubsection}{\numberline {2.0.1}Online store Scenario}{5}{subsubsection.2.0.1}%
+\contentsline {subsubsection}{\numberline {2.0.2}Coffee Order Scenario}{8}{subsubsection.2.0.2}%
+\contentsline {section}{\numberline {3}Individual contribution}{11}{section.3}%

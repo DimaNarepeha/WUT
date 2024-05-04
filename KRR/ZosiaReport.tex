@@ -1,0 +1,1012 @@
+\documentclass[a4paper]{article}
+
+\bibliographystyle{elsarticle-num}
+\usepackage{longtable, caption, listings, xcolor, fancyvrb}
+\usepackage{minted}
+\usepackage{subcaption}
+\usepackage{fixltx2e}
+\usepackage{amssymb}
+\usepackage[margin=1.5in, foot=.25in]{geometry}
+\usepackage[labelformat=parens,labelsep=quad,skip=4pt]{caption}
+\usepackage{graphicx}
+\usepackage[makeroom]{cancel}
+\usepackage{enumitem}
+\usepackage[colorlinks]{hyperref}
+\setlength{\belowcaptionskip}{\baselineskip}
+
+\input{style/common.tex}
+\input{style/scala.tex}
+
+\fvset{frame=single, framesep=2mm,fontfamily=courier,fontsize=\scriptsize, numbers=left,framerule=.3mm,numbersep=2mm,commandchars=\\\{\}}
+
+
+% \lstset{frame=, basicstyle={\footnotesize\ttfamily}, breaklines=true, postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space}, }
+
+\graphicspath{ {images/} }
+
+%-----------------------------------------BEGIN DOC----------------------------------------
+
+\begin{document}
+
+\title{
+KRR Project - Documentation {\large\linebreak\\}}
+\author{
+Sonia Grzywacz 245492\\[0.1cm]
+Zofia Wrona 305803 \\[0.1cm]
+Patryk Grochowicz 305779 \\[0.1cm]
+Piotr Krzemiński 305785\\[0.1cm]
+Marcin Świerkot 294569 \\[0.5cm]
+Warsaw University of Technology\\
+Faculty of Computer Science and Information Systems\\
+}
+\date{\today}
+\maketitle
+
+\begin{abstract}
+The aim of the task was to define an action description language $\mathcal{ADL_{CST}}$ and corresponding query language $\mathcal{QL_{CST}}$ that will allow describing a specific group of dynamic systems that takes into account cost-related aspects. Accordingly, this contribution consists of two parts - the theoretical description of the task and the documentation of its practical implementation. In the first part, the introduction provides a brief overview of the task, including the assumptions applied to the corresponding group of dynamic systems. Then, the action description language is defined by means of its syntax and semantics. Following that, the query language is discussed in terms of proposed queries and their satisfiability conditions. Lastly, the theory is concluded with descriptions of various examples that provide an understanding of how the proposed languages can be applied in practice. The second part focuses on the description of the technical aspects of the implemented solution -- i.e. used technology, implemented interface and the performed tests. 
+\end{abstract}
+
+\tableofcontents\label{c}
+\newpage
+
+\section{Theoretical description}
+\subsection{Introduction}
+Let \emph{DS\textsubscript{CST}} be a class of dynamic systems that are the primary focus of this task. \emph{DS\textsubscript{CST}} fulfills the following assumptions: 
+\begin{enumerate}[label=A{{\arabic*}}., leftmargin=*]
+    \item  \textbf{Inertia law} -- the observed changes, after performing a given action, are only the ones that are directly or indirectly induced by the aforementioned action 
+    \item \textbf{Complete information about all actions and all fluents} -- there are no unknown effects of the actions 
+    \item \textbf{Determinism} -- there is only one possible outcome of an action 
+    \item \textbf{Branching model of time} -- time steps are represented by branching points 
+    \item \textbf{Only sequential actions are allowed} -- the parallel actions are out of consideration 
+    \item \textbf{Domain constraints are not admitted} -- there are no restrictions set for the domain 
+    \item \textbf{All actions can be performed in all states} --  all actions are executable
+    \item \textbf{Characteristics of actions}:
+        \begin{itemize}
+            \item[] $\vartriangleright$ precondition (a set of literals) reflecting a condition under which the action starts and leads to some effect. If a precondition does not hold, then the action is executed with an empty effect
+            \item[] $\vartriangleright$ postcondition (a set of literals) reflecting the effect of the action
+            \item[] $\vartriangleright$ cost $\kappa \in \mathbb{N}$ required to perform the action. It depends on the state in which the action starts
+        \end{itemize}
+\end{enumerate}
+\subsubsection{Task description}
+The task of this project is stated as follows:
+\begin{quote}
+\itshape
+Define an action description language \emph{ADL\textsubscript{CST}} for representing dynamic systems of the class specified above, and define the corresponding query language \emph{QL\textsubscript{CST}} which would allow getting answers for the following queries:
+\begin{enumerate}[label=Q{{\arabic*}}.]
+    \item Does a condition $\gamma$ (set of literals) hold after performing a program $\mathcal{P}$?
+    \item Is cost $\kappa$ sufficient to perform a program $\mathcal{P}$?
+\end{enumerate}
+\end{quote}
+%
+\subsection{Action description language}
+%
+Let $\mathcal{ADL_{CST}}$ be an action description language defined to represent a class of dynamic systems that satisfy the assumptions outlined in the previous section. The following terminology will be used to specify the syntax of the $\mathcal{ADL_{CST}}$ language: \\~\\
+$\Upsilon = (\mathcal{F}, \mathcal{A}_c)$ - signature of the language, where:
+\begin{itemize}
+    \item[-] $\mathcal{F}$ is a set of fluents
+    \item[-] $\mathcal{A}_c$ is a set of actions
+\end{itemize}
+$\Bar{f}$ - literal corresponding to the fluent $f \in \mathcal{F}$ or its negation $\neg f$ \\[0.5\baselineskip]
+$\kappa$ - cost corresponding to the action execution ($k \in \mathbb{N}$) \\[0.5\baselineskip]
+$\mathcal{P} = (A_1,\dotsc,A_n)$ - program, sequence of actions.
+%
+\subsubsection{Syntax} \label{statements}
+%
+Two types of statements were defined for the $\mathcal{ADL_{CST}}$ language. The first ones are the \textbf{value statements}. They describe the state (more precisely, fluents) that initially holds in the system or holds in the system after performing a particular sequence of actions. The second types of statement are the \textbf{effect statements}. They describe how the system's state changes after performing a given action, namely, what state will result from performing a given action under specified preconditions.
+\\ \\
+\textbf{\textit{1. Value statements}}
+\\ \\
+It is important to stress that the second value statement is, in fact, an abbreviation of the first one (i.e. it is not a separate value statement).
+\begin{enumerate}
+    \item $\Bar{f}$ \textbf{after} $A_1,\dotsc,A_n$ (where $f \in \mathcal{F}$ and $A_1,\dotsc,A_n \in \mathcal{A}_c$) \\[0.5\baselineskip]
+    Meaning: $\Bar{f}$ holds after performing a set of actions $A_1,\dotsc,A_n$ in the initial state
+    \item \textbf{initially} $\Bar{f}$ where $f \in \mathcal{F}$ \\[0.5\baselineskip]
+    Meaning: $\Bar{f}$ holds in the initial state
+\end{enumerate}
+\textbf{\textit{2. Effect statements}}
+\\ \\
+Similarly to the previous section, the second effect statement is an abbreviation of the first one. It emphasizes that the action is executed with no specific preconditions that have to be met before its execution.
+\begin{enumerate}
+    \item A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa$ where $f,g_1,\dotsc,g_k\in\mathcal{F}$, $A\in\mathcal{A}_c$ and $\kappa\in\mathbb{N}$ \\[0.5\baselineskip]
+    Meaning: If A is performed in any state satisfying $\Bar{g_1},\dotsc,\Bar{g_k}$ then in the resulting state $\Bar{f}$ holds, and the cost that is required to perform such an action is equal to $\kappa$
+    \item A \textbf{causes} $\Bar{f}$ \textbf{cost} $\kappa$ where $f\in\mathcal{F}$ and $\kappa\in\mathbb{N}$ \\[0.5\baselineskip]
+    Meaning: The performance of action A leads to the state for which $\Bar{f}$ holds and the cost that is required to perform such an action is equal to $\kappa$ 
+\end{enumerate}
+%
+\subsubsection{Semantics}
+%
+The \textbf{structure} of a language $\mathcal{ADL_{CST}}$ is a pair $S=(\Psi,\sigma_0)$ where $\Psi$ is a transition function and $\sigma_0\in\Sigma$ is the initial state. \\[0.5\baselineskip]
+A \textbf{state} is defined as a mapping $\sigma\colon\mathcal{F}\rightarrow\{0, 1\}$, for any $f\in\mathcal{F}$. \\
+If $\sigma(f)=1$, then it means that $f$ holds in the state $\sigma$ and it is denoted by $\sigma\models f$. \\
+If $\sigma(f)=0$, then it means that $f$ doesn't hold in the state $\sigma$ and it is denoted $\sigma\models\neg f$. \\
+Furthermore, let $\Sigma$ denote a set of all states. 
+\\ \\
+\textbf{\textit{1. Transition function}}
+\\ \\
+A \textbf{transition function} is defined as a mapping $\Psi\colon(\mathcal{A}_c,\kappa)\times\Sigma\rightarrow\Sigma$. \\
+$\Psi((A,\kappa),\sigma)$ defined for any $A\in\mathcal{A}_c$, for any $\sigma\in\Sigma$ and for any $\kappa\in\mathbb{N}$ gives a resulting state after performing the action $A$ from the state $\sigma$ with cost $\kappa$, where $\kappa$ is a sum of all costs associated with effects of the action $A$. \\[0.5\baselineskip]
+The aforementioned function can also be generalized to the mapping $\Psi^\ast\colon(\mathcal{A}_c,\kappa)^\ast\times\Sigma\rightarrow\Sigma$ in a following way:
+\begin{enumerate}
+    \item $\Psi^\ast((\epsilon,0),\sigma)=\sigma$
+    \item $\Psi^\ast(((A_1,\kappa_1),\dotsc,(A_n,\kappa_n)),\sigma)=\Psi((A_n,\kappa_n),\Psi^\ast(((A_1,\kappa_1),\dotsc,(A_{n-1},\kappa_{n-1})),\sigma))$
+\end{enumerate}
+However, for the sake of simplification, the $\Psi^\ast$ will be further denoted as $\Psi$.
+\\ \\
+\textbf{\textit{2. Satisfiability of language statements}}
+\\ \\
+Let $S=(\Psi, \sigma_0)$ be a structure for a language $\mathcal{ADL_{CST}}$. A statement $s$ is true in $S$ (denoted by $S\models s$), if and only if:
+\begin{enumerate}
+    \item $s$ is of the form: $\Bar{f}$ \textbf{after} $A_1,\dotsc A_n$ \\[0.5\baselineskip]
+    $S\models s$ if and only if for an initial state $\sigma_0\in\Sigma$ and the set of actions $A_1,\dotsc,A_n\in\mathcal{A}_c$, the following holds: $\Psi^\ast(((A_1,\kappa_1),\dotsc,(A_n,\kappa_n)),\sigma)$
+    \item $s$ is of the form: A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa$ \\[0.5\baselineskip]
+    $S\models s$ if and only if for every state $\sigma\in\Sigma$ such that $\sigma\models\Bar{g_i},i=1,\dotsc,k$ and the action $A\in\mathcal{A}_c$, the following holds: $\Psi((A,\kappa),\sigma)\models\Bar{f}$ and cost of performing the action is $\kappa$
+\end{enumerate}
+\textbf{\textit{3. Model of a language}}
+\\ \\
+Let D be an action domain (non-empty set of value or effect statements) in the language $\mathcal{ADL_{CST}}$ over a signature $\Upsilon = (\mathcal{F}, \mathcal{A}_c)$. A structure for this language $S=(\Psi,\sigma_0)$ is a model of D if and only if:
+\begin{enumerate}
+    \item for every $s \in D$, $S \models s$
+    \item for every $A\in\mathcal{A}_c$, for every $f,g_1,\dotsc,g_k\in\mathcal{F}$, for every $\sigma\in\Sigma$ and for every $\kappa \in \mathbb{N}$, if one of the following conditions holds:
+    \begin{enumerate}[label=(\alph*)]
+        \item for every effect statement in D of the form A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa$ $\sigma \cancel{\models} \Bar{g_i}$ for some $i = 1,\dotsc,k$
+        \item D does not contain an effect statement A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa$
+    \end{enumerate}
+    then $\sigma\models f$ if and only if $\Psi((A,\kappa),\sigma) \models f$
+    \item for every $A\in\mathcal{A}_c$, for every $f,g_1,\dotsc,g_k\in\mathcal{F}$ and for every $\kappa_1,\kappa_2 \in \mathbb{N}$, if one of the following conditions holds:
+    \begin{enumerate}[label=(\alph*)]
+        \item if D contains two effect statements D of the form: \\ 
+        A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa_1$ \\
+        A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa_2$ \\
+        then $\kappa_1 = \kappa_2$ 
+        \item D does not contain an effect statement A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa_1$ or does not contain A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa_2$
+    \end{enumerate}
+    \item for every $A\in\mathcal{A}_c$, for every $f_1,\dotsc,f_n,g_1,\dotsc,g_l\in\mathcal{F}$, for every $\sigma\in\Sigma$ and for every $\kappa_1,\dotsc,\kappa_n \in \mathbb{N}$, the following condition holds:
+    \begin{enumerate}[label=(\alph*)]
+        \item for all effect statements in D of the form: \\ 
+        A \textbf{causes} $\Bar{f_1}$ if $\Bar{g_1},\dotsc,\Bar{g_l}$ \textbf{cost} $\kappa_1$ \\
+        \vdots 
+        \\
+        A \textbf{causes} $\Bar{f_n}$ if $\Bar{g_1},\dotsc,\Bar{g_l}$ \textbf{cost} $\kappa_n$ \\ 
+        if $\sigma\models g_i$ for all $i\in\{1,\dotsc l\}$ then $\kappa$ in $\Psi((A,\kappa),\sigma)$ is such that $\kappa = \kappa_1 + \dotsc + \kappa_n$ 
+    \end{enumerate}
+\end{enumerate}
+%
+\subsection{Query Language}
+%
+Let $\mathcal{QL_{CST}}$ be the query language corresponding to the $\mathcal{ADL_{CST}}$. 
+%
+\subsubsection{Query statements}
+%
+There were two types of queries defined for $\mathcal{QL_{CST}}$, namely the \textbf{value queries} and \textbf{sufficiency queries}. The value queries answer the question of whether a given condition is satisfied after performing a sequence of actions. The sufficiency queries evaluate if a given cost is sufficient for execution of sequence of actions.
+\\[0.5\baselineskip]
+\textbf{\textit{1. Value queries}}
+\\[0.5\baselineskip]
+The value query is defined in the following way:
+\begin{enumerate}
+    \item $\gamma$ after $A_1\dotsc A_n$ \\[0.5\baselineskip]
+    Meaning: does the condition $\gamma$ hold after executing the sequence of actions $A_1\dotsc A_n$?
+\end{enumerate}
+\textbf{\textit{2. Sufficiency queries}}
+\\[0.5\baselineskip]
+The total cost of the execution of the sequence of actions $A_1\dotsc A_n$ is defined as the sum of all costs associated with executed actions. Accordingly, the sufficiency query is defined in the following way:
+\begin{enumerate}
+    \item \textbf{sufficient} $\kappa$ in $A_1\dotsc A_n$ \\[0.5\baselineskip]
+    Meaning: is the cost $\kappa$ sufficient to execute the sequence of action $A_1\dotsc A_n$?
+\end{enumerate}
+\subsubsection{Satisfiability of queries}
+Let $D$ be an action domain. A query $Q$ is a consequence of $D$, denoted by $D \models Q$, if and only if $Q$ is true in every model of $D$:
+\begin{enumerate}
+    \item Q is of the form: $\gamma$ \textbf{after} $A_1\dotsc A_n$ \\[0.5\baselineskip]
+    $D \models Q$ if and only if for any model $S=(\Psi,\sigma_0)$ of $D$, for every state $\sigma\in\Sigma$ and actions $A_1,\dotsc,A_n\in\mathcal{A}_c$ (i.e. $A_1,\dotsc,A_n$ are all actions executed in that exact order), the following holds $\Psi(((A_1,\kappa_1),\dotsc,(A_n,\kappa_n)),\sigma)\models\gamma$ (i.e. the resulting state after execution of $A_1\dotsc A_n$ is $\gamma$)
+    \item Q is of the form: \textbf{sufficient} $\kappa$ in $A_1\dotsc A_n$ \\[0.5\baselineskip]
+    $D \models Q$ if and only if for any model $S=(\Psi,\sigma_0)$ of $D$ and for every state $\sigma\in\Sigma$ the sum of costs associated with performing the set of actions $A_1,\dotsc,A_n$ is smaller or equal to $\kappa$ (i.e. if a transition function $\Psi$ for a particular set of actions $A_1,\dotsc,A_n\in\mathcal{A}_c$ and $\sigma\in\Sigma$ is associated with the costs $\kappa_1,\dotsc,\kappa_n$ then for $\Psi(((A_1,\kappa_1),\dotsc,(A_n,\kappa_n)),\sigma)$ total cost $K=\kappa_1+\dotsc+\kappa_n$, the query is then satisfied iff $K\le\kappa$)
+\end{enumerate}
+\subsection{Examples of dynamic systems}
+\subsubsection{Titanic}
+We want to model the survival process of Jack and Rose after the Titanic ship sinks. We will use a class of dynamic systems to represent the actions and decisions that Jack and Rose could make in order to survive. We can assume that at the beginning of the scene, both Jack and Rose are in the water and not at the door. 
+Let us define the possible actions:
+\begin{enumerate}
+    \item Jack moves onto the door
+    \item Rose moves onto the door
+    \item Jack and Rose move onto the door
+    \item Jack stays in the water
+\end{enumerate}
+Furthermore, the set of all possible considered states is: $\Sigma = \{{\sigma_0, \sigma_1, \sigma_2, \sigma_3, \sigma_4, \sigma_5, \sigma_6, \sigma_7\}}$, where:
+\begin{center}
+$\sigma_0 = $\{{$\neg$Jack on the door, $\neg$Rose on the door, Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_1 = $\{{ Jack on the door, $\neg$Rose on the door, Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_2 = $\{{$\neg$Jack on the door,  Rose on the door, Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_3 = $\{{Jack on the door,  Rose on the door, Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_4 = $\{{$\neg$Jack on the door, $\neg$Rose on the door, $\neg$Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_5 = $\{{ Jack on the door, $\neg$Rose on the door, $\neg$Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_6 = $\{{$\neg$Jack on the door,  Rose on the door, $\neg$Jack alive\}} \\[0.1\baselineskip] 
+$\sigma_7 = $\{{Jack on the door,  Rose on the door, $\neg$Jack alive\}} \\[0.1\baselineskip]
+\end{center}
+The scenario structure is as follows:
+\begin{center}
+\textbf{initially} $\neg$\textit{Jack on the door} \\[0.1\baselineskip] 
+\textbf{initially} $\neg$\textit{Rose on the door} \\[0.1\baselineskip] 
+\textbf{initially} \textit{Jack alive} \\[0.5\baselineskip]
+\textit{Jack moves onto the door} \textbf{causes} \textit{Jack on the door} \\ \textbf{if} $\neg$\textit{Jack on the door}, \textit{Jack alive} \textbf{cost} 1 \\[0.5\baselineskip]
+\textit{Rose moves onto the door} \textbf{causes} \textit{Rose on the door} \\ \textbf{if} $\neg$\textit{Rose on the door} \textbf{cost} 1 \\[0.5\baselineskip]
+\textit{Jack and Rose move onto the door} \textbf{causes} \textit{Rose on the door} \\ \textbf{if} $\neg$\textit{Rose on the door} \textbf{cost} 1 \\[0.5\baselineskip]
+\textit{Jack and Rose move onto the door} \textbf{causes} \textit{Jack on the door} \\ \textbf{if} $\neg$\textit{Jack on the door}, \textit{Jack alive} \textbf{cost} 1 \\[0.5\baselineskip]
+\textit{Jack stays in the water} \textbf{causes} $\neg$\textit{Jack alive} \\ \textbf{if} $\neg$\textit{Jack on the door}, \textit{Jack alive} \textbf{cost} 0 \\[0.5\baselineskip]
+\end{center}
+Let us illustrate all possible transitions. \\[0.5\baselineskip] 
+$\Psi((\text{Jack  moves onto the door},1),\sigma_0)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_0)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_0)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack stays in the water},0),\sigma_0)$ = $\sigma_4$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_1)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_1)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_1)$ = $\sigma_3$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_1)$ = $\sigma_1$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_2)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_2)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_2)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack stays in the water},0),\sigma_2)$ = $\sigma_6$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_3)$ = $\sigma_3$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack  moves onto the door},1),\sigma_4)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_4)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_4)$ = $\sigma_6$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_4)$ = $\sigma_4$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_5)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_5)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_5)$ = $\sigma_7$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_5)$ = $\sigma_5$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_6)$ = $\sigma_6$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_6)$ = $\sigma_6$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_6)$ = $\sigma_6$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_6)$ = $\sigma_6$ \\[0.7\baselineskip] 
+$\Psi((\text{Jack moves onto the door},1),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose moves onto the door},1),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Jack and Rose move onto the door},2),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip]
+$\Psi((\text{Jack stays in the water},0),\sigma_7)$ = $\sigma_7$ \\[0.7\baselineskip] 
+Figure~\ref{fig:titanic_transitions} presents all aforementioned transitions on a graph.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{images/titanic_transitions_new.png}
+    \caption{Titanic scenario - graph of all possible transitions}
+    \label{fig:titanic_transitions}
+\end{figure}
+Let us demonstrate an example of asking queries using the structure of the query language $\mathcal{QL_{CST}}$. Assume, that the initial state is $\sigma_0$ and the program $\mathcal{P}$ = (\textit{Jack moves onto the door}, \textit{Rose moves onto the door}). Let us consider the following query statements:
+\begin{enumerate}
+    \item \textit{Jack alive} \textbf{after} (\textit{Jack  moves onto the door}, \textit{Rose moves onto the door})
+    \item \textbf{sufficient} 1 \textbf{in} (\textit{Jack  moves onto the door}, \textit{Rose moves onto the door})
+\end{enumerate}
+The program execution will consist of the following transitions: \\[0.5\baselineskip]
+$\Psi((\text{Jack  moves onto the door},1),\sigma_0)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Rose  moves onto the door},1),\sigma_1)$ = $\sigma_3$ \\[0.5\baselineskip]
+Hence, after the program execution, the state $\sigma_3$ will hold. Due to that, query number one will retrieve a positive response (i.e. \textit{true}). However, notice that the total cost of the aforementioned transitions is equal to 2. Thus, cost 1 is insufficient to execute such a program and consequently, query number 2 will respond with \textit{false}.
+\subsubsection{Shipping orders}
+There is an order that needs to be processed and delivered to the customer. The status of an order can be described by the following literals: received, packed, shipped, delivered and empty. Initially, the order is neither received nor packed, nor shipped, not delivered, and the shipping box for an order is empty.  Placing and order makes it received. Packing an order makes it packed and also the shipping box becomes non-empty. Shipping an order makes it shipped and finally delivering it makes it delivered. Each of those aforementioned actions has an associated cost attached in case the initial conditions for performing a specific action are met. \\
+The set of all considered states in this scenario is defined as $\Sigma = \{{\sigma_0, \sigma_1, \sigma_2, \sigma_3, \sigma_4\}}$, where:
+\begin{center}
+$\sigma_0 = \{${$\neg$received, $\neg$packed, $\neg$shipped, $\neg$delivered, empty}\} \\[0.1\baselineskip]
+$\sigma_1 = \{${received, $\neg$packed, $\neg$shipped, $\neg$delivered, empty}\} \\[0.1\baselineskip]
+$\sigma_2 = \{${received, packed, $\neg$shipped, $\neg$delivered, $\neg$empty}\} \\[0.1\baselineskip]
+$\sigma_3 = \{${received, packed, shipped, $\neg$delivered, $\neg$empty}\} \\[0.1\baselineskip]
+$\sigma_4 = \{${received, packed, hipped, delivered, $\neg$empty}\}
+\end{center}
+The structure of the scenario is as follows:
+\begin{center}
+\textbf{initially} $\neg$\textit{received} \\[0.1\baselineskip]
+\textbf{initially} $\neg$\textit{packed} \\[0.1\baselineskip]
+\textbf{initially} $\neg$\textit{shipped} \\[0.1\baselineskip]
+\textbf{initially} $\neg$\textit{delivered} \\[0.1\baselineskip]
+\textbf{initially} \textit{empty} \\[0.5\baselineskip]
+\textit{Place} \textbf{causes} \textit{received} \textbf{if} $\neg$\textit{received} \textbf{cost} 1 \\[0.1\baselineskip]
+\textit{Pack} \textbf{causes} \textit{packed} \textbf{if} \textit{received}, $\neg$\textit{packed} \textbf{cost} 2 \\[0.1\baselineskip]
+\textit{Pack} \textbf{causes} $\neg$\textit{empty} \textbf{if} \textit{received}, $\neg$\textit{packed} \textbf{cost} 0 \\[0.1\baselineskip]
+\textit{Ship} \textbf{causes} \textit{shipped} \textbf{if} \textit{packed}, $\neg$\textit{shipped} \textbf{cost} 3 \\[0.1\baselineskip]
+\textit{Deliver} \textbf{causes} \textit{delivered} \textbf{if} \textit{shipped}, $\neg$\textit{delivered} \textbf{cost} 2 \\[0.5\baselineskip]
+\end{center}
+Hence, the following states are considered in this case: \\[0.5\baselineskip] 
+$\Psi((\text{Place},1),\sigma_0)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack},2),\sigma_0)$ = $\sigma_0$ \\[0.1\baselineskip] 
+$\Psi((\text{Ship},3),\sigma_0)$ = $\sigma_0$ \\[0.1\baselineskip] 
+$\Psi((\text{Deliver},2),\sigma_0)$ = $\sigma_0$ \\[0.7\baselineskip]
+$\Psi((\text{Place},1),\sigma_1)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack},2),\sigma_1)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Ship},3),\sigma_1)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Deliver},2),\sigma_1)$ = $\sigma_1$ \\[0.7\baselineskip] 
+$\Psi((\text{Place},1),\sigma_2)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack},2),\sigma_2)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Ship},3),\sigma_2)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Deliver},2),\sigma_2)$ = $\sigma_2$ \\[0.7\baselineskip] 
+$\Psi((\text{Place},1),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack},2),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Ship},3),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Deliver},2),\sigma_3)$ = $\sigma_4$ \\[0.7\baselineskip] 
+$\Psi((\text{Place},1),\sigma_4)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack},2),\sigma_4)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Ship},3),\sigma_4)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Deliver},2),\sigma_4)$ = $\sigma_4$ \\[0.7\baselineskip] 
+Figure~\ref{fig:shipping_transitions} outlines all of the aforementioned transitions.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/ship_orders.png}
+    \caption{Shipping orders - all possible transitions}
+    \label{fig:shipping_transitions}
+\end{figure}
+Similarly, as in the previous scenario, let us demonstrate an example of asking queries using the structure of the query language $\mathcal{QL_{CST}}$. Assume, that the initial state is $\sigma_0$ and the program $\mathcal{P}$ = (\textit{Place}, \textit{Pack}, \textit{Ship}, \textit{Deliver}). Let us consider the following query statements:
+\begin{enumerate}
+    \item $\neg$\textit{delivered} \textbf{after} (\textit{Place}, \textit{Pack}, \textit{Ship}, \textit{Deliver})
+    \item \textbf{sufficient} 10 \textbf{in} (\textit{Place}, \textit{Pack}, \textit{Ship}, \textit{Deliver})
+\end{enumerate}
+The program execution will consist of the following transitions: \\[0.5\baselineskip]
+$\Psi((\text{Place},1),\sigma_0)$ = $\sigma_1$ \\[0.1\baselineskip]
+$\Psi((\text{Pack},2),\sigma_1)$ = $\sigma_2$ \\[0.1\baselineskip]
+$\Psi((\text{Ship},3),\sigma_2)$ = $\sigma_3$ \\[0.1\baselineskip]
+$\Psi((\text{Deliver},2),\sigma_3)$ = $\sigma_4$ \\[0.7\baselineskip]
+As it can be observed, after the program execution, the state $\sigma_4$ will hold. Due to that, query number one will retrieve a negative response (i.e. \textit{false}), as in the final state \textit{delivered} holds. On the other hand, the second query will respond with \textit{true} as the total cost 8 is smaller than 10.
+\subsubsection{Preparing for holidays}
+A family is preparing for the holidays. Due to the fact that they are traveling by plane, there is a limit on the weight of their luggage. In this regard, packing the next item is associated with some arbitrary cost corresponding to its weight. It is assumed that all necessary items have been packed by the family, and there is still some space available in the luggage. Due to this, they decided to take some additional equipment that would make their trip more entertaining. They considered a laptop, books, or sports equipment. When taking the laptop, the family must also take the charger. It is assumed that initially, the luggage is empty.
+Following, are the states considered in the system $\Sigma = \{{\sigma_0, \sigma_1, \sigma_2, \sigma_3, \sigma_4, \sigma_5, \sigma_6, \sigma_7, \sigma_8, \sigma_9\}}$, where:
+\begin{center}
+$\sigma_0$ = \{$\neg$has laptop, $\neg$has charger, $\neg$has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_1$ = \{$\neg$has laptop, has charger, $\neg$has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_2$ = \{$\neg$has laptop, has charger, has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_3$ = \{$\neg$has laptop, has charger, $\neg$has books, has sports equipment\} \\[0.1\baselineskip]
+$\sigma_4$ = \{has laptop, has charger, $\neg$has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_5$ = \{has laptop, has charger, has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_6$ = \{has laptop, has charger, $\neg$has books, has sports equipment\} \\[0.1\baselineskip]
+$\sigma_7$ = \{has laptop, has charger, has books, has sports equipment\} \\[0.1\baselineskip]
+$\sigma_8$ = \{$\neg$has laptop, $\neg$has charger, has books, $\neg$has sports equipment\} \\[0.1\baselineskip]
+$\sigma_9$ = \{$\neg$has laptop, $\neg$has charger, has books, has sports equipment\} \\[0.1\baselineskip]
+$\sigma_{10}$ = \{$\neg$has laptop, has charger, has books, has sports equipment\} \\[0.1\baselineskip]
+$\sigma_{11}$ = \{$\neg$has laptop, $\neg$has charger, $\neg$has books, has sports equipment\} \\[0.1\baselineskip]
+\end{center}
+Furthermore, the actions that were taken into account are:
+\begin{enumerate}
+    \item Pack laptop
+    \item Pack books
+    \item Pack sports equipment
+    \item Pack charger
+\end{enumerate}
+The system structure is described in the following way:
+\begin{center}
+    \textbf{initially} $\neg$\textit{has laptop} \\[0.1\baselineskip]
+    \textbf{initially} $\neg$\textit{has charger} \\[0.1\baselineskip]
+    \textbf{initially} $\neg$\textit{has books} \\[0.1\baselineskip]
+    \textbf{initially} $\neg$\textit{has sports equipment} \\[0.1\baselineskip]
+    \textit{Pack laptop} \textbf{causes} \textit{has laptop} \textbf{if} $\neg$\textit{has laptop}, \textit{has charger} \textbf{cost} 10 \\[0.1\baselineskip]
+    \textit{Pack charger} \textbf{causes} \textit{has charger}  \textbf{if} $\neg$\textit{has charger} \textbf{cost} 5 \\[0.1\baselineskip]
+    \textit{Pack books} \textbf{causes} \textit{has books} \textbf{if} $\neg$\textit{has books} \textbf{cost} 15 \\[0.1\baselineskip]
+    \textit{Pack sports equipment} \textbf{causes} \textit{has sports equipment} \textbf{if} $\neg$\textit{has sports equipment} \textbf{cost} 30 \\[0.1\baselineskip]
+\end{center}
+Hence, let us list all possible transitions: \\[0.5\baselineskip] 
+$\Psi((\text{Pack laptop},10),\sigma_0)$ = $\sigma_0$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_0)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_0)$ = $\sigma_8$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_0)$ = $\sigma_{11}$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_1)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_1)$ = $\sigma_1$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_1)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_1)$ = $\sigma_3$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_2)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_2)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_2)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_2)$ = $\sigma_{10}$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_3)$ = $\sigma_6$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_3)$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_3)$ = $\sigma_{10}$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_3)$ = $\sigma_3$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_4)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_4)$ = $\sigma_4$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_4)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_4)$ = $\sigma_6$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_5)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_5)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_5)$ = $\sigma_5$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_5)$ = $\sigma_7$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_6)$ = $\sigma_6$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_6)$ = $\sigma_6$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_6)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_6)$ = $\sigma_6$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_7)$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_7)$ = $\sigma_7$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_8)$ = $\sigma_8$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_8)$ = $\sigma_2$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_8)$ = $\sigma_8$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_8)$ = $\sigma_9$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_9)$ = $\sigma_9$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_9)$ = $\sigma_{10}$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_9)$ = $\sigma_9$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_9)$ = $\sigma_9$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_{10})$ = $\sigma_7$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_{10})$ = $\sigma_{10}$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_{10})$ = $\sigma_{10}$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_{10})$ = $\sigma_{10}$ \\[0.7\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_{11})$ = $\sigma_{11}$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack charger},5),\sigma_{11})$ = $\sigma_3$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack books},15),\sigma_{11})$ = $\sigma_9$ \\[0.1\baselineskip] 
+$\Psi((\text{Pack sports equipment},30),\sigma_{11})$ = $\sigma_{10}$ \\[0.7\baselineskip]
+The above transitions are presented in Figure~\ref{fig:holidays_transitions}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1.2\linewidth]{images/holidays_new.png}
+    \caption{Holiday packing - all possible transitions}
+    \label{fig:holidays_transitions}
+\end{figure}
+Finally, let us demonstrate queries for the above example. Assume, that the initial state is $\sigma_0$ and the program $\mathcal{P}$ = (\textit{Pack sports equipment}, \textit{Pack books}, \textit{Pack laptop}). Let us consider the following query statements:
+\begin{enumerate}
+    \item \textit{has laptop} \textbf{after} (\textit{Pack sports equipment}, \textit{Pack books}, \textit{Pack laptop})
+    \item \textbf{sufficient} 40 \textbf{in} (\textit{Pack sports equipment}, \textit{Pack books}, \textit{Pack laptop})
+\end{enumerate}
+The program execution will consist of the following transitions: \\[0.5\baselineskip]
+$\Psi((\text{Pack sports equipment},30),\sigma_0)$ = $\sigma_{11}$ \\[0.1\baselineskip]
+$\Psi((\text{Pack books},15),\sigma_{11})$ = $\sigma_9$ \\[0.1\baselineskip]
+$\Psi((\text{Pack laptop},10),\sigma_9)$ = $\sigma_9$ \\[0.5\baselineskip]
+It can be noted that the last transition is associated with a cost 10 although the state doesn't change. Due to the fact that preconditions that are required to successfully execute the \emph{Pack laptop} action are not met, the action has empty effects. After the program execution, the last state is, therefore, $\sigma_9$. Hence, the response of the first query will be \textit{false}. The response to the second query will also be \textit{false}, as the total cost of the program execution is 55 which is greater than 40.
+
+\section{Technical description}
+\subsection{Introduction}
+%
+The goal of the application was to provide the user with the handy and intuitive tool that could be used to model the behaviour of different dynamic systems that adhere to a specific set of requirements (as mentioned in the introduction. These assumptions were taken into account during the implementation. It is important to point out that they need to be taken into consideration by the user, who shall be aware of the potential limitations of the modelled systems. Nevertheless, within those defined assumptions, the application's features can facilitate the exploration and analysis of the behaviour of this subset of dynamic systems. 
+\subsection{Technology}
+%
+The application was implemented as a web application using \textbf{Windows Forms}, which is an open-source UI framework for building Windows desktop app that enables quick delivery and ensures intuitive and visually appealing design. In the development process, this framework allowed the creation of a user-friendly interface that provides a way of managing data such as \textit{fluents} and \textit{actions}. In addition to that, components from this library were used to produce a convenient view responsible for program creation. The desktop application also allows displaying the graphs associated with the created program. It was done with the help of the \textbf{GoDiagram} component.
+
+\subsection{Classes}
+The definition of the data type in the web application was mostly done with the help of classes from external libraries, such as \textbf{Syncfusion}. However, to ensure more readable and understandable code, five classes were added, mostly associated with the statements created by the user and the state of the program used in graph creation:
+\begin{itemize}
+    \item \emph{State}: It represents a state and holds information about its fluents and cost. The \emph{literals} attribute is a list of strings representing the fluents associated with the state. The class also defines an \emph{equals} method that compares two State objects for equality based on their fluents.
+    \item \emph{Statement}: It serves as a base class for different types of statements. It has two attributes: \emph{type}, which represents the type of the statement, and \emph{text}, which holds the markdown content of the statement.
+    \item \emph{InitiallyStatement}:
+    This class inherits from the Statement class. It represents statements of the type: \textbf{initially} $\Bar{f}$. The \emph{type} attribute is set to the enumerable value \textit{INITIALLY}. It also has an additional attribute \emph{condition} that indicates which fluents hold in the initial state of the system.
+    \item \emph{CausesStatement}:
+    This class inherits from the Statement class. It represents statements of the type: A \textbf{causes} $\Bar{f}$ if $\Bar{g_1},\dotsc,\Bar{g_k}$ \textbf{cost} $\kappa$ The \emph{type} attribute is set to the enumerable value \textit{CAUSES}. It has additional attributes: \emph{action} represents the action that is to be executed, \emph{postcondition} denotes a literal that will hold in the resulting state, \emph{precondition} represents a condition that has to be met for an action to execute (if this condition is not met the action has empty effects) and \emph{cost} that represents the cost associated with the action.
+    \item \emph{AfterStatement}:
+    This class inherits from the Statement class. It represents statements of the type: $\Bar{f}$ \textbf{after} $A_1,\dotsc,A_n$. The \emph{type} attribute is set to the enumerable value \textit{AFTER}. It has additional attributes: \emph{postcondition}, which represents the literal that will hold after actions execution, and\emph{actions}, which is a list of strings representing the sequence of actions performed.
+\end{itemize}
+\subsection{Sections}
+%
+The applications consist of the following sections, each of which provides the user with the part of the functionality needed to fully simulate the behaviour of the desired dynamic system:
+\begin{itemize}
+    \item \textbf{Fluents and actions}. This section allows users to manage fluents and actions. The application provides the following functionalities: 
+    \begin{itemize}
+        \item \textbf{Adding Fluents and Actions}: Provides text input fields and buttons for users to add new fluents and actions to the application. Upon clicking the \textit{Add} button, the respective inputs are processed and stored (both fluents and actions are held as a list of strings)
+        \item \textbf{Fluents View}: Displays the added fluents in a view. Each fluent is shown along with a checkbox. The user is able to mark multiple fluents and delete them using the dedicated \textit{Delete} button. There is also an option to delete all fluents at once.
+        \item \textbf{Actions View}: Displays the added actions in a view. Each action is shown along with a checkbox that works in the same manner as in the case of the fluents. There is also an option to delete all actions at once.
+   \end{itemize}
+    \item \textbf{Add Statement}. This part allows users to create and manage an action domain consisting of a set of value and effect statements. The following functionalities are provided by the application: 
+    \begin{itemize}
+        \item The application provides a panel for adding statements, where users can select the statement type (definition of the initial state is represented by $Initially~statement$, effect statement is represented by $Effect~statement$, value statement is represented by $Value~statement$) and input relevant details based on the selected type.
+        \item For \textit{Initially} statements, users can select a literal that holds in the initial state (the set of fluents from which the user chooses is provided to him based on the input values on the previous page). The user can either select the literal from the list or write it by hand.
+        \item For \textit{Effect} statements, users can select an action, postcondition and precondition (similarly, the list of available actions and fluents is provided by the application, and users can also write literals/actions by hand). 
+        \item For \textit{Value} statements, users can select a fluent that will hold in the resulting state and the set of actions causing the change (the list of available actions and fluents is also provided by the application).
+        \item Users can add a statement by clicking the \textit{Add} button in the \textit{ADD STATEMENT} section, and the inputted statement is processed and added to the session state (each statement is an object of the class presented above).
+        \item The Action Domain panel displays the added statements, where each statement is shown along with a button to delete it. The user can also delete here all statements at once or display the visualization of a given action domain.
+   \end{itemize}
+       \item \textbf{Execute program}. This part allows users to specify the sequence of actions and the initial state and execute the program (based on the previously defined action domain), in order to see what will be its total cost and final state
+   \begin{itemize}
+        \item The user can specify the sequence of actions separated by semicolons and the initial state (the possibility of the selection of the initial state was added to the fact that some domains can have more than 1 model)
+        \item After pressing the \textit{EXECUTE PROGRAM} button, the given action sequence will be executed and the final state as well as the total cost of the program execution will be returned (displayed next to the \textit{FINIAL STATE} and \textit{FINAL COST} labels)
+    \end{itemize}
+   \item \textbf{Visualisation window}. This part allows users to see the graph depicting all possible states of the models, together with all possible transitions between them. The displayed graph has the following properties: 
+   \begin{itemize}
+        \item Each node of the graph represents the state of the system that is reachable in the system from a given initial state.
+        \item The arrows between the nodes illustrate the transitions between the particular states as a result of an execution of a particular action.
+        \item Each arrow is labelled with information about the action performed and the cost of transition between those two states.
+        \item The initial state is marked green colour. If there are multiple green-coloured nodes, then it means that there are several models in a given domain, and each green node represents the initial state of every one of them.
+        \item The user is able to drag the nodes and links in order to get a better view of the graph.
+    \end{itemize}
+    \item \textbf{Query and Query result}. This part allows users to insert query statements and see below query result.
+    \begin{itemize}
+        \item The view provides a query functionality that allows users to perform two types of queries: \emph{Value} and \emph{Cost} queries.
+        \item For a \emph{Value} query, it checks if a provided condition is satisfied after the execution of the sequence of actions from the given initial state
+        \item For a \emph{Cost} query, it compares the provided cost value with the overall cost of the execution of the sequence of actions. 
+        \item The query results are displayed in the form of the pop-up for the users with the corresponding message (QUERY CORRECT/QUERY INCORRECT) and blue information indicator when query is satisfied or red cross otherwise
+   \end{itemize}
+\end{itemize}
+
+\section{User guide}
+\subsection{Application}
+%
+This application is a practical solution for executing the ``Actions with Costs'' task. With this program, users have the ability to create scenarios to test the Action Description Language $\mathcal{ADL_{CST}}$ and its corresponding Query Language $\mathcal{QL_{CST}}$. These languages enable the description of specific groups of dynamic systems, considering concepts related to costs.
+
+\subsection{Instruction how to run application}
+%
+For proper program execution, Windows OS is required. To run the application, User should double click on file \begin{verbatim}actions_with_costs.exe\end{verbatim}
+%
+\subsection{Application functionalities}
+The application has one main window where the User can define the action domains and execute the programs. In order to see the visualization result, the User should click the button \textit{OPEN VISUALIZATION} that brings up a separate window with a state diagram.
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/ug_main_view.jpg}
+    \caption{Main window}
+    \label{fig:cm-rho-001}
+\end{figure}
+
+
+\begin{itemize}
+    \item \textbf{Add Fluents and Actions}
+        \begin{itemize}
+        \item[] To add Fluent, User should insert the name of the fluent in the text box under \textit{ADD FLUENT} label and click \textit{ADD} button below (or press Enter).
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.4\textwidth]{images/ug_Insert_fluent.jpg}
+            \caption{Setting fluent}
+            \label{fig:cm-rho-001}
+        \end{figure}
+        \item[] To add Action, User should insert the name of the action in the text box under \textit{ADD ACTION} label and click \textit{ADD} button below (or press Enter).
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.4\textwidth]{images/ug_insert_action.jpg}
+            \caption{Setting action}
+            \label{fig:cm-rho-001}
+        \end{figure}
+        \item[] Inserted items will appear in the text boxes on the right-hand side, for both Fluents and Actions separately.
+        \item[] User is able to remove Fluent or Action, by first, selecting all fluents that are to be removed, and then clicking \textit{DELETE} button to remove them from the list. The user is also able to remove all fluents (or actions) at once, by pressing \textit{REMOVE ALL} button.
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.6\textwidth]{images/ug_action_fluent_view.jpg}
+            \caption{Fluent and actions tables}
+            \label{fig:cm-rho-001}
+        \end{figure}
+        \end{itemize}
+    \item \textbf{Add Statements to Action Domain}
+        \begin{itemize}
+        \item[] After selecting fluents and actions, the User can go to the next section, \textit{ADD STATEMENT}, where the User is able to create statements.
+        \item[] Under \textit{ADD STATEMENT} there is a drop-down list where the User can select between $Initially~statement$, $Value~statement$, $Effect~statement$.
+            \begin{figure}[H]
+                        \centering
+                        \includegraphics[width=0.4\textwidth]{images/ug_as_statements.png}
+                        \caption{Setting statements}
+                        \label{fig:cm-rho-001}
+                    \end{figure}
+        \item[] To add a statement User should click \textit{ADD STATEMENT} button at the bottom of the section.
+            \begin{itemize}
+                \item $Initially~statement$ - choosing it from a drop-down list will display the selector field to provide literals. The User can select the literals either from the list, or provide them by hand.
+                    \begin{figure}[H]
+                        \centering
+                        \includegraphics[width=0.4\textwidth]{images/ug_initially.png}
+                        \caption{Setting Initially statement}
+                        \label{fig:cm-rho-001}
+                    \end{figure}
+                \item $Effect~statement$ - choosing it from a drop-down list will display 4 input fills by which the User can:
+                    \begin{itemize}
+                        \item select Action on the top of the label \textit{CAUSES}
+                        \item select resulting fluents on the top of the label \textit{IF}
+                        \item select conditional fluents on the top of the label \textit{COST}
+                        \item Insert number that corresponds to the cost assigned to the fluent
+                    \end{itemize}
+                    \begin{figure}[H]
+                        \centering
+                        \includegraphics[width=0.4\textwidth]{images/ug_effect.png}
+                        \caption{Setting Effect statement}
+                        \label{fig:cm-rho-001}
+                    \end{figure}
+                \item $Value~statement$ - choosing it from a drop-down list will display two input fields, where the User is able to select literal on the top of the label \textit{AFTER} and specify the action (underneath the label \textit{AFTER})
+                    \begin{figure}[H]
+                        \centering
+                        \includegraphics[width=0.4\textwidth]{images/ug_value.png}
+                        \caption{Setting Value statement}
+                        \label{fig:cm-rho-001}
+                    \end{figure}
+            \end{itemize}
+        \item[] All statements specified in the forms described above, will appear in the \textit{ACTION DOMAIN} section. There, the user can select and remove statements (using \textit{DELETE} button), remove all statements (using \textit{DELETE ALL} button) or display the visualization window by pressing \textit{OPEN VISUALIZATION} button).
+        \begin{figure}[H]
+                        \centering
+                        \includegraphics[width=0.6\textwidth]{images/action_domain.jpg}
+                        \caption{Action Domain section}
+                        \label{fig:actdomain}
+                    \end{figure}
+        \end{itemize}
+    \item \textbf{Program specification and its execution}
+        \begin{itemize}
+            \item[] The user is able to execute the program that will use a specified action domain. To do so, the user has the possibility to specify the sequence of actions that are to be executed and the initial state from which the program will start the execution. To do so, in checkboxes named $Type-in-actions$ and $Choose-state$ user can respectively provide a sequence of actions and the state from which execution begins.
+                \begin{figure}[H]
+                    \centering
+                    \includegraphics[width=0.7\textwidth]{images/specify_program.png}
+                    \caption{Choose action and Choose state for program execution}
+                    \label{fig:cm-rho-001}
+                \end{figure}
+            \item[] In order to execute the program, the User should click on the button \textit{EXECUTE PROGRAM}. The results of its execution, including the resulting state and the cost are shown below.
+               \begin{figure}[H]
+                    \centering
+                    \includegraphics[width=0.7\textwidth]{images/final_state_with.png}
+                    \caption{Final state and cost}
+                    \label{fig:cm-rho-001}
+                \end{figure}
+        \end{itemize}
+    \item \textbf{Visualisation}
+        \begin{itemize}
+            \item[] The user can also open a visualisation of an action domain by clicking on the \textit{OPEN VISUALISATION} button. The resulting graph depicts all reachable states (given possible initial states), together with all possible transitions between them. It has the following properties: each node of the graph represents the state of the system, and the number of nodes is equal to the number of all possible combinations of literals corresponding to fluents minus the states that have to be excluded because of the conditions imposed by statements from the action domain. The arrows between the nodes illustrate the transitions between the particular states as a result of an execution of a particular action. Each arrow is labelled with information about the action performed and the transition cost between those two states. Finally, the initial state is marked as a green node.
+                \begin{figure}[H]
+                    \centering
+                    \includegraphics[width=0.7\textwidth]{images/graph.png}
+                    \caption{State graph}
+                    \label{fig:cm-rho-001}
+                \end{figure}
+        \end{itemize}
+    \item \textbf{Query}
+        \begin{itemize}
+            \item[] The user can post queries using the 'Query' side panel.
+            \begin{figure}[H]
+                \centering
+                \begin{minipage}[b]{0.4\textwidth}
+                    \includegraphics[width=\textwidth]{images/query_side_panel_value.png}
+                    \caption{Query side panel - Value Query}
+                    \label{fig:cm-rho-001}
+                \end{minipage}
+                \begin{minipage}[b]{0.4\textwidth}
+                    \includegraphics[width=\textwidth]{images/query_side_panel_cost.png}
+                    \caption{Query side panel - Cost Query}
+                    \label{fig:cm-rho-001}
+                \end{minipage}
+            \end{figure}
+            There are 2 types of queries available: 'Value' and 'Cost', as shown above. Value query follows the idea of the value statement in the action domain. The user is able to select a fluent from the drop-down box that should appear in the output state after performing actions from the set initial state. The validators prevent an incorrect query execution should it contain corrupt/incorrect input data. The cost query is similar to the value query, however it checks whether the provided cost is sufficient to execute the list of actions from the specified initial state instead.
+
+            After sucessfully excuting the query, a popup message with the result will show as follows:
+            \begin{figure}[H]
+                \centering
+                \begin{minipage}[b]{0.4\textwidth}
+                    \includegraphics[width=\textwidth]{images/query_correct.png}
+                    \caption{Correct query popup}
+                    \label{fig:cm-rho-001}
+                \end{minipage}
+                \begin{minipage}[b]{0.4\textwidth}
+                    \includegraphics[width=\textwidth]{images/query_incorrect.png}
+                    \caption{Incorrect query popup}
+                    \label{fig:cm-rho-001}
+                \end{minipage}
+            \end{figure}
+            For 'Value' queries, the popup provides the message about the final state of the system when executing the query from provided starting coditions. For the 'Cost' query, the final cost is provided instead.
+        \end{itemize}
+\end{itemize}
+
+\section{Test description}
+%
+The application tests were performed in two steps: 1) testing the user experience and 2) testing the semantic and syntax correctness of the prepared application.
+\subsection{Testing user experience (UX/UI testing)}
+%
+The aim of UX/UI tests was to evaluate whether all of the functionalities offered by the application are working accordingly to their intended use. Specifically, this part of testing puts the emphasis on the evaluation of all available application components and controls, such as buttons, input fields, selectors etc. The list of the performed tests includes:
+
+\begin{enumerate}
+    \item \textbf{Verification of \textit{Add Fluent/Add Action} section}:
+    \begin{enumerate}
+        \item Verification if the user cannot add two fluents (or actions) with identical names
+        \item Verification if the user cannot add fluent beginning with $\sim$ sign (since it is reserved to indicate fluent negation)
+        \item Verification if the user cannot add empty fluents (or actions)
+        \item Verification if the user can add fluents (or actions) using both \textit{Add} button and after pressing the \textit{Enter} key
+        \item Verification if the \textit{Add} button is disabled when there are no fluents (or actions) that are to be added
+        \item Verification if the user can remove one or more fluents (or actions) 
+        \item Verification if the user can remove all fluents (or actions) at once
+        \item Verification if the \textit{Remove All} and \textit{Remove} buttons are properly disabled when there are no fluents (or actions) that are to be removed
+        \item Verification if the user is prompted if she/he attempts to remove fluents (or actions) that are currently used in some statements of the action domain (in such case, the user should also be offered to automatically clear the action domain statements)
+    \end{enumerate}
+    \item \textbf{Verification of \textit{Add Statement} section}:
+    \begin{enumerate}
+        \item Verification if the user can select between three types of available statements: \textit{Initially}, \textit{Value} (\textit{After}) and \textit{Effect} (\textit{Causes}) statements
+        \item Verification if upon selecting a given statement type, proper input/selector fields are displayed for the user
+        \item Verification if the user cannot add two equivalent statements
+        \item Verification of each type of statement:
+        \begin{itemize}
+            \item \textit{Initially}:
+            \begin{itemize}
+                \item Verification if the user cannot add initially statement with no literals selected
+                \item Verification if the user cannot add initially statement that contains a complementary literal to one of the initially statements already existing in the domain (e.g. $~alive$ and $alive$ at the same time)
+                \item Verification if the user can provide literals by both selecting them from the list and writing them by hand
+                \item Verification if the user cannot add literal (provided by hand) with a name of fluent that was not previously specified
+            \end{itemize}
+            \item \textit{Value}:
+            \begin{itemize}
+                \item Verification if the user cannot add a value statement without specifying the action and the postcondition literal
+                (the abbreviation of value statement has been specified separately, therefore, specifying action here is obligatory)
+                \item Verification if the user can select more than one action
+                \item Verification if the user cannot specify two value statements with complementary literals that would hold after the same action sequence (i.e. preventing model inconsistency)
+                \item Verifying if the user can provide postcondition literal both by selecting it from the list and by writing it by hand
+                \item Verification if the literals provided by the user in the postcondition part correspond to existing literals
+            \end{itemize}
+            \item \textit{Effect}:
+            \begin{itemize}
+                \item Verification if the user can provide postcondition and action both by hand and by selecting them from corresponding lists
+                \item Verification if the user cannot add the effect statement without specifying the action or the postcondition
+                \item Verification if the user cannot provide actions or literals that do not correspond to fluents or actions specified in the \textit{Add Fluent/Add Action} section
+                \item Verification if the user cannot add two effect statements of the same action that lead to complementary literals when having the same preconditions (i.e. preventing model inconsistency)
+                \item Verification if the user cannot provide two effect statements with the same action, postcondition and preconditions, but different costs (i.e. preventing model inconsistency)
+                \item Verification if the user cannot give negative cost (i.e. cost that violates the assumptions)
+            \end{itemize}
+        \end{itemize}
+        \item Verification if the user will be prompted with a corresponding message when she/he provides incorrect input (i.e. inputs mentioned above)
+    \end{enumerate}
+    \item \textbf{Verification of \textit{Action Domain} section}:
+    \begin{enumerate}
+        \item Verification if all added statements appear in their corresponding order in the action domain field
+        \item Verification if the statements can be selected (one or many) and deleted using \textit{Delete} button
+        \item Verification if the user can delete all statements using \textit{Delete All} button
+        \item Verification if, when the provided action domain is inconsistent, the red text \textit{``Domain is inconsistent''} is being displayed
+        \item Verification if the buttons are disabled when no statements are selected (or provided)
+        \item Verification if the \textit{Open Visualization} button is disabled when inconsistent model is provided
+        \item Verification if after pressing \textit{Open Visualization} button, the window containing \textit{State Diagram} of action domain model(-s) is displayed (with possible initial states indicated using green colour)
+        \item Verification if the user cannot specify the program to be executed when the model is inconsistent or when no statements are provided
+        \item Verification if the user can specify the sequence of actions that are to be executed in the program using ``,'' as a separator
+        \item Verification if the input of action sequence is properly parsed
+        \item Verification if the user can select among all available initial states (including restriction of states put by \textit{after} and \textit{initially} statements) when specifying from which state the program should start
+        \item Verification if the user can press \textit{Execute Program} button only when both aforementioned fields are filled
+        \item Verification if the executed program yields the correct final state and presents the correct overall cost
+    \end{enumerate}
+    \item \textbf{Verification of \textit{Query} section}:
+    \begin{enumerate}
+        \item Verification if the user can select among two available query options: \textit{Value} and \textit{Cost} queries
+        \item Verification if the selection of appropriate query displays all its input and selector fields
+        \item Verification if the \textit{Execute Query} button is disabled when the model is inconsistent or when there are no statements in the action domain
+        \item Verification of each query type:
+        \begin{itemize}
+            \item \textit{Value}:
+            \begin{itemize}
+                \item Verification if the user can provide literals, both by hand or from the list, and if all available literals are offered in the list
+                \item Verification if the user can provide the sequence of actions (i.e. program) by hand using ``,'' as separators between consecutively executed actions
+                \item Verification if the actions and literals provided by the user correspond to the fluents and actions given in \textit{Add Fluent/Add Action} section
+                \item Verification if the user can repeat some actions in the provided program
+                \item Verification if the selector of initial states (i.e. state from which the program will be executed - necessary when the action domain has more than one model) contains all initial states corresponding to the states obtained from \textit{Action Domain} section
+                \item Verification if the user cannot execute the query if not all fields are provided
+                \item Verification if the query yields a correct result
+            \end{itemize}
+            \item \textit{Cost}:
+            \begin{itemize}
+                \item Verification if the user cannot give a cost that is smaller than 0
+                \item Verification if the user can specify the program in the same manner as in the case of the \textit{Value} query
+                \item Verification if the user can specify the initial state in the same manner as in the \textit{Value} query
+            \end{itemize}
+        \end{itemize}
+        \item Verification if, in the case of any violation of the above conditions, the user is prompted with a warning message
+    \end{enumerate}
+    \item \textbf{Verification of \textit{Menu} panel}:
+    \begin{itemize}
+        \item Verification if the user can clear all input provided in the application using \textit{Clear All} button
+    \end{itemize}
+\end{enumerate}
+
+All of the above tests yielded successful results, hence, assuring that the application is working as intended. Therefore, the tests could proceed to the next phase, which was focused on the evaluation of how well the application is performing in real-case scenarios.
+
+\subsection{Syntax and semantic correctness testing}
+%
+The main aim of the second testing phase was to evaluate if the application is adhering correctly to the model consistency. In particular, these tests focused on executing example scenarios in which the domain models could be either consistent or not and evaluating if:
+\begin{enumerate}
+    \item Application can properly detect the inconsistency of the model
+    \item Application is visualizing the state graphs correctly
+    \item Based on a given action domain, program specification and initial state, the application can correctly calculate the final state and final cost
+\end{enumerate}
+
+Therefore, the remaining part of the testing section will focus on describing various test scenarios, the simple and complex ones, that were used in performed tests.
+
+\subsection{Test 1 - Yale Shooting Problem}
+%
+The \textit{Yale Shooting Problem} was used as the first testing scenario since it is one of the most simple cases and, hence can give an indicator if the application works correctly on the ``happy path''. To recall, the formulation of the scenario is as follows: \\[0.5\baselineskip]
+\textit{There is a shooter Bill and a turkey Fred. Initially Fred is alive and Bill has an unloaded gun. Bill can perform two actions: loading the gun (LOAD) and shooting the gun (SHOOT). Loading the gun makes the gun loaded, while shooting the gun makes it unloaded and, in addition, Fred in not alive anymore, provided that the gun was loaded.} \\[0.5\baselineskip]
+The scenario was represented in the application as presented in Figure~\ref{fig:ysp1} (some arbitrary costs were also added).
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\linewidth]{images-test/YSP1.jpg}
+    \caption{Representation of YSP simple scenario}
+    \label{fig:ysp1}
+\end{figure}
+The first thing that could be observed was that there was no indication of model inconsistency, hence, the application was able to properly recognize the consistent model. The state graph obtained for this scenario is presented in Figure~\ref{fig:ysp2}.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\linewidth]{images-test/YSP2.jpg}
+    \caption{State diagram of YSP simple scenario visualization}
+    \label{fig:ysp2}
+\end{figure}
+As can be seen, the visualization contains correct transitions. The initial state is marked on the green colour and corresponds to the state restricted with \textit{initially} statements. The program execution was evaluated for the action sequence \textit{\{LOAD\}} and gave the result presented in Figure~\ref{fig:ysp3}, which is correct (as can also be verified on the graph visualization).
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images-test/YSP3.jpg}
+    \caption{Result of program execution in YSP simple scenario for action sequence LOAD}
+    \label{fig:ysp3}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Test 2 - YSP modified with after statement}
+%
+The aim of the second test was to evaluate if the application will properly take into consideration the \textit{after} statements. The test compared the results obtained after executing two similar YSP-based scenarios. The scenarios are as follows:
+\\[0.5\baselineskip]
+\textbf{\textit{Scenario 1:}} \\
+\textit{There is a shooter Bill and a turkey Fred. Initially, Fred is alive. Bill can perform two actions: loading the gun (LOAD) and shooting the gun (SHOOT). It is known that the shooting action makes the gun unloaded, and if the gun was prior loaded, then it kills Fred.} \\[0.5\baselineskip]
+\textbf{\textit{Scenario 2:}} \\
+\textit{There is a shooter Bill and a turkey Fred. Initially, Fred is alive. Bill can perform two actions: loading the gun (LOAD) and shooting the gun (SHOOT). It is known that the shooting action makes the gun unloaded, and if the gun was prior loaded, then it kills Fred. Additionally, it was observed that after shooting, Fred was NOT alive.} \\[0.5\baselineskip]
+The representation of both scenarios in the program can be seen in Figure~\ref{fig:ysp4} and Figure~\ref{fig:ysp5}. As one can observe, both action domains are consistent, which is correct. The second action domain differs from the first one by the act that it contains the \textit{after} statement. In both action domains, \textit{initially} specifies only part of the initial state. However, as in the second case, there is an observation, it gives the indicator about the possible initial states, restricting their number. 
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\linewidth]{images-test/YSP4.jpg}
+    \caption{Representation of the YSP-based scenario without after statement}
+    \label{fig:ysp4}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\linewidth]{images-test/YSP6.jpg}
+    \caption{Representation of the YSP-based scenario with after statement}
+    \label{fig:ysp5}
+\end{figure}
+The state graphs are presented in Figure~\ref{fig:ysp6} and Figure~\ref{fig:ysp7}.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images-test/YSP5.jpg}
+    \caption{State diagram of YSP-based scenario without after statement}
+    \label{fig:ysp6}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.5\linewidth]{images-test/YSP7.jpg}
+    \caption{State diagram of YSP-based scenario with after statement}
+    \label{fig:ysp7}
+\end{figure}
+The first visualization presents two possible models - in the first one, the initial state contains the negation of the fluent \textit{loaded}, while the second one has an initial state with positive \textit{loaded}. It corresponds to the defined action domain since there was no information about the initial state of that fluent. However, the second visualization presents only a single possible model. It comes from the fact that the \textit{after} statement indicated that the \textit{SHOOT} action caused Fred to be killed. The only possibility of that would be if the gun was prior loaded, hence only such state was taken under consideration.
+In addition, for the second scenario, the program was executed with action sequence \textit{\{SHOOT\}}. The result (presented in Figure~\ref{fig:ysp8}) was once again as expected
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.7\linewidth]{images-test/YSP8.jpg}
+    \caption{Result of program execution in YSP-based scenario with after statement for action sequence SHOOT}
+    \label{fig:ysp8}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Test 3 - Action domain inconsistency testing}
+%
+The aim of the tests from this group was to evaluate if the application could properly recognize the inconsistency in the action domain. Therefore, the following two test scenarios were used:
+\\[0.5\baselineskip]
+\textbf{\textit{Scenario 1:}} \\
+\textit{There is a student who did not have breakfast and therefore is initially hungry. The student is commuting to the university. After arriving at the place, the student is not hungry anymore.} \\[0.5\baselineskip]
+\textbf{\textit{Scenario 2:}} \\
+\textit{There is a painter who aims to paint the wall. The painter can start the action \textit{PAINT}, making the wall \textit{pained} if he has some paint left. Initially, the painter had some paint left. It was observed that after painting, the wall had not been painted.} \\[0.5\baselineskip]
+The representation of the above scenarios in the application is presented in Figure~\ref{fig:ysp9} and Figure~\ref{fig:ysp10} correspondingly.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{images-test/student.jpg}
+    \caption{Representation of the scenario with hungry student}
+    \label{fig:ysp9}
+\end{figure}
+As can be seen, in both examples, the application returned the information that the action domain is inconsistent. In the case of the hungry student, there were no statements which would specify the effects of the action \textit{GO TO UNIVERSITY}. Therefore, as the assumptions of this class of dynamic systems say that all effects of the actions are specified, it can be stipulated that the \textit{GO TO UNIVERSITY} action has an empty effect. However, the execution of it led to a state which changed the initial state of the given fluent, and therefore such a domain is inconsistent. In the second example, the effect of the action \textit{PAINT}, which could be executed in all initial states, as in all of them the painter \textit{hasPaint}, had the complementary effect to the one which was observed (i.e. specified in \textit{after} statement). Therefore, once again, the action domain is indeed inconsistent, which was correctly recognized by the application. 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{images-test/painer.jpg}
+    \caption{Representation of the scenario with painter}
+    \label{fig:ysp10}
+\end{figure}
+
+\subsection{Test 4 - Titanic example}
+%
+The last two tests considered more complicated scenarios which were previously presented in the theoretical examples section (specifically, the scenario of Titanic and Delivery). The firs scenario of the story is as follows:
+\\[0.5\baselineskip]
+\textit{We want to model the survival process of Jack and Rose after the Titanic ship sank. We will use a class of dynamic systems to represent the actions and decisions that Jack and Rose could make in order to survive. We can assume that at the beginning of the scene, both Jack and Rose are in the water and not at the door.} \\ \\
+The fluents that were considered in the scenario are:
+\begin{enumerate}
+    \item \textbf{Jack on door}
+    \item \textbf{Rose on door}
+    \item \textbf{Jack alive}
+\end{enumerate}
+The list of the actions considered in this scenario was:
+\begin{enumerate}
+    \item \textbf{Jack moves}
+    \item \textbf{Rose moves}
+    \item \textbf{Jack and Rose move}
+    \item \textbf{Jack stays in the water}
+\end{enumerate}
+The program defined using the application is presented in Figure~\ref{fig:ysp11} (the same definition as in the example from theoretical section).
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images-test/titanic1.jpg}
+    \caption{Program definition for the Titanic scenario}
+    \label{fig:ysp11}
+\end{figure}
+The visualization of the domain is presented in Figure~\ref{fig:ysp12}. It can be easily compared with the visualization prepared by hand in the theoretical section. Both obtained figures present the same results, hence, the application is working correctly. Additionally, to evaluate the program execution, the sequence of actions \textit{\{Jack moves, Rose moves\}} has been specified. Once again, the same sequence of actions was used in the theoretical example so the results are comparable. The obtained state is presented in Figure~\ref{fig:ysp13}.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images-test/titanic2.jpg}
+    \caption{State diagram of Titanic scenario}
+    \label{fig:ysp12}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images-test/titanic3.jpg}
+    \caption{Result of program execution in Titanic scenario}
+    \label{fig:ysp13}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Test 5 - Shipping orders example}
+%
+The second complicated scenario test used the example of package delivery. To recall, the formulation of the scenario is as follows:
+\\[0.5\baselineskip]
+\textit{There is an order that needs to be processed and delivered to the customer. The status of an order can be described by the following literals: received, packed, shipped, delivered and empty. Initially, the order is neither received nor packed, nor shipped, not delivered, and the shipping box for an order is empty. Placing and order makes it received. Packing an order makes it packed and also the shipping box becomes non-empty. Shipping an order makes it shipped and finally delivering it makes it delivered. Each of those aforementioned actions has an associated cost attached in case the initial conditions for
+performing a specific action are met.}
+\\[0.5\baselineskip]
+The fluents that were considered in the scenario are:
+\begin{enumerate}
+    \item \textbf{received}
+    \item \textbf{packed}
+    \item \textbf{shipped}
+    \item \textbf{delivered}
+    \item \textbf{empty}
+\end{enumerate}
+The list of the actions considered in this scenario was:
+\begin{enumerate}
+    \item \textbf{Place}
+    \item \textbf{Pack}
+    \item \textbf{Ship}
+    \item \textbf{Deliver}
+\end{enumerate}
+The representation of the scenario prepared in the application is presented in Figure~\ref{fig:ysp14}, while the graph representation is visible in Figure~\ref{fig:ysp15}. As can be observed, the obtained graph representation corresponds to the one presented in the example. In order to evaluate the results of the execution of the program, the following sequence of actions has been specified: \textit{\{Place, Pack, Ship, Delivery\}}. The resulting state and final cost, which are presented in Figure~\ref{fig:ysp16} correspond to the ones obtained in the theoretical section. Therefore, as all tests yielded positive results, it can be concluded that the application is working semantically and syntactically correct.
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images-test/package.jpg}
+    \caption{Representation of the package delivery scenario}
+    \label{fig:ysp14}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images-test/package1.jpg}
+    \caption{State diagram of package delivery scenario}
+    \label{fig:ysp15}
+\end{figure}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=0.6\linewidth]{images-test/package2.jpg}
+    \caption{Result of program execution for scenario with package delivery}
+    \label{fig:ysp16}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Individual contribution}
+%
+The following table summarizes the individual contribution of each of the team members. Bellow the table, each team member specified the percentage of her/his work in each of the two parts of the project: theoretical part and practical. All members contributed to the tests.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+Action description language (syntax, semantics)          & Zofia Wrona \\& Marcin Świerkot  \\ \hline
+Query language (query statements, satisfability of queries)      & Zofia Wrona \\& Marcin Świerkot  \\ \hline
+Examples of dynamic systems (Titanic)          & Zofia Wrona\\& Sonia Grzywacz \\& Marcin Świerkot \\ \hline
+Examples of dynamic systems (Shipping orders)           & Zofia Wrona \\& Sonia Grzywacz \\& Marcin Świerkot  \\ \hline
+Examples of dynamic systems (Preparing for holidays)       & Zofia Wrona \\& Marcin Świerkot \\ \hline
+General layout of the application                              & Zofia Wrona \\& Sonia Grzywacz  \\& Piotr Krzemiński \\& Marcin Świerkot \\ & Patryk Grochowicz  \\ \hline
+Technical Description (Introduction, Technology, Classes, Sections)                             & Patryk Grochowicz \\ & Marcin Świerkot \\ \hline
+Fluents and actions section (add fluents/actions, display fluents/actions)                            & Zofia Wrona \\& Piotr Krzemiński \\ & Patryk Grochowicz \\& Marcin Świerkot \\ \hline
+Create action domain section (add statements, check consistency)   & Zofia Wrona \\& Piotr Krzemiński \\& Marcin Świerkot \\ \hline
+Create program section (add actions and states) & Zofia Wrona \\& Piotr Krzemiński \\& Marcin Świerkot \\ \hline
+Create program section (evaluation of cost and final state)                          & Zofia Wrona \\& Piotr Krzemiński \\& Marcin Świerkot \\ \hline
+Query section (value/sufficiency query implementation)                            & Piotr Krzemiński \\ \hline
+Visualisation section (states and cost evaluation)                              & Zofia Wrona \\ & Piotr Krzemiński \\ \hline
+Visualisation section (graph visualisation)                            & Zofia Wrona \\ & Piotr Krzemiński \\ \hline
+Syntax and semantic testing  & Zofia Wrona \\& Sonia Grzywacz \\ & Piotr Krzemiński \\& Patryk Grochowicz \\& Marcin Świerkot  \\\hline
+Scenario testing (Titanic example)                      & Zofia Wrona\\& Sonia Grzywacz \\& Piotr Krzemiński \\& Patryk Grochowicz \\& Marcin Świerkot \\ \hline
+Scenario testing (Shipping orders example)           & Zofia Wrona\\& Sonia Grzywacz\\& Piotr Krzemiński \\& Patryk Grochowicz \\& Marcin Świerkot \\ \hline
+\end{tabular}
+\caption{Responsibilities}
+\label{thesis-table}
+\end{table}
+\\
+
+\begin{enumerate}
+    \item \textbf{Zofia Wrona} -- Theoretical part: 70\%  Practical part: 30\%
+    \item \textbf{Marcin Świerkot} -- Theoretical part: 60\%  Practical part: 40\%
+    \item \textbf{Sonia Grzywacz} -- Theoretical part: 60\%  Practical part: 40\%
+    \item \textbf{Piotr Krzemiński} -- Theoretical part: 40\%  Practical part: 60\%
+    \item \textbf{Patryk Grochowicz} -- Theoretical part: 50\%  Practical part: 50\%
+\end{enumerate}
+
+
+% ---------  EXAMPLE HOW TO PASTE FIGURES ----------
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=1.2\linewidth]{images/holidays_new.png}
+%     \caption{Holiday packing - all possible transitions}
+%     \label{fig:holidays_transitions}
+% \end{figure}
+
+\end{document}
