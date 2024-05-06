@@ -38,7 +38,6 @@ class MLP:
         self.velocity_w = []  # for momentum
         self.velocity_b = []  # for momentum
 
-        # Initialize weights and biases with Xavier/Glorot initialization for tanh (or He initialization)
         for i in range(len(layers) - 1):
             stddev = np.sqrt(2 / (layers[i] + layers[i + 1])) if activation == 'tanh' else np.sqrt(1 / layers[i])
             self.weights.append(np.random.normal(0, stddev, (layers[i], layers[i + 1])))
