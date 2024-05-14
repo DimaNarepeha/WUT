@@ -1,9 +1,8 @@
 import numpy as np
 import tkinter as tk
-from tkinter import messagebox, simpledialog, filedialog, ttk
+from tkinter import messagebox, simpledialog, filedialog
 
-
-class HAM:
+class HopfieldAssociativeMemory:
     def __init__(self):
         self.weights = None
 
@@ -16,46 +15,35 @@ class HAM:
         np.fill_diagonal(self.weights, 0)
 
     def recall(self, input_pattern, max_iterations=100):
-        input_patterns = np.array(input_pattern)
+        input_pattern = np.array(input_pattern)
+        current_pattern = input_pattern.copy()
+        prev_pattern = np.zeros_like(current_pattern)
+        cycle_detected = False
+
         outputs = []
-        energies = []
 
-        for input_pattern in input_patterns:
-            input_pattern = np.array(input_pattern)
-            current_pattern = input_pattern.copy()
-            prev_pattern = np.zeros_like(current_pattern)
-            cycle_detected = False
+        for i in range(max_iterations):
+            next_pattern = np.sign(np.dot(self.weights, current_pattern))
 
-            for i in range(max_iterations):
-                next_pattern = np.sign(np.dot(self.weights, current_pattern))
+            if np.array_equal(next_pattern, current_pattern):
+                return outputs, self.calculate_energy(current_pattern)
 
-                if np.array_equal(next_pattern, current_pattern):
-                    outputs.append(current_pattern.tolist())
-                    energies.append(self.calculate_energy(current_pattern))
-                    break
+            if np.array_equal(next_pattern, prev_pattern):
+                cycle_detected = True
+                break
 
-                if np.array_equal(next_pattern, prev_pattern):
-                    cycle_detected = True
-                    break
+            outputs.append(current_pattern.tolist())
 
-                prev_pattern = current_pattern.copy()
-                current_pattern = next_pattern
+            prev_pattern = current_pattern.copy()
+            current_pattern = next_pattern
 
-            if cycle_detected:
-                energy = self.calculate_energy(prev_pattern)
-                outputs.append(prev_pattern.tolist())
-                energies.append(energy)
-                outputs.append("Cycle of length two detected.")
-                energies.append(None)
-
-        if not outputs:
-            return "Network did not converge.", None
+        if cycle_detected:
+            return outputs + [prev_pattern.tolist()], "Cycle of length two detected."
         else:
-            return outputs, energies
+            return "Network did not converge.", None
 
     def calculate_energy(self, pattern):
         return -0.5 * np.dot(np.dot(pattern, self.weights), pattern)
-
 
 def read_input_from_file(file_path, representation):
     valid_characters = {'unipolar': {'0', '1'}, 'bipolar': {'1', '-1'}}
@@ -78,39 +66,14 @@ def read_input_from_file(file_path, representation):
             input_patterns.append(pattern)
     return input_patterns
 
-
-def read_input_from_gui(input_size, representation):
-    def create_matrix_frame():
-        nonlocal matrix_frame, matrix_entries
-        matrix_frame = ttk.Frame(gui)
-        matrix_frame.grid(row=2, column=0, padx=10, pady=10)
-
-        matrix_entries = []
-        for i in range(input_size):
-            row_entries = []
-            for j in range(input_size):
-                entry_var = tk.StringVar(value="1" if representation == "bipolar" else "")
-                entry = ttk.Entry(matrix_frame, textvariable=entry_var, width=5)
-                entry.grid(row=i, column=j)
-                row_entries.append(entry_var)
-            matrix_entries.append(row_entries)
-
-        submit_btn = ttk.Button(matrix_frame, text="Submit Pattern", command=submit_matrix)
-        submit_btn.grid(row=input_size, columnspan=input_size, pady=10)
-
-    def confirm_size():
-        nonlocal matrix_frame
-        if matrix_frame:
-            matrix_frame.destroy()
-        create_matrix_frame()
-
-    def submit_matrix():
-        nonlocal matrix
-        matrix = []
-        for i in range(input_size):
+def read_input_from_gui(num_columns, num_rows, representation):
+    def submit_input_matrix():
+        nonlocal input_matrix
+        input_matrix = []
+        for i in range(num_rows):
             row_values = []
-            for j in range(input_size):
-                value = matrix_entries[i][j].get()
+            for j in range(num_columns):
+                value = input_entries[i][j].get()
                 if representation == "unipolar":
                     if value not in ["0", "1"]:
                         messagebox.showerror("Error", "Values must be 0 or 1.")
@@ -121,142 +84,158 @@ def read_input_from_gui(input_size, representation):
                         messagebox.showerror("Error", "Values must be -1 or 1.")
                         return
                     row_values.append(int(value))
-            matrix.append(row_values)
+            input_matrix.append(row_values)
         gui.destroy()
 
-    matrix = None
-    matrix_frame = None
-    matrix_entries = []
+    input_matrix = None
 
     gui = tk.Tk()
-    gui.title("Matrix Input")
+    gui.title("Input Matrix")
 
-    main_frame = ttk.Frame(gui, padding="10 10 10 10")
-    main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+    input_entries = []
+    for i in range(num_rows):
+        row_entries = []
+        for j in range(num_columns):
+            entry_var = tk.StringVar()
+            entry = tk.Entry(gui, textvariable=entry_var, width=5)
+            entry.grid(row=i, column=j)
+            row_entries.append(entry_var)
+        input_entries.append(row_entries)
 
-    size_label = ttk.Label(main_frame, text="Enter the size of the input pattern:")
-    size_label.grid(row=0, column=0, padx=5, pady=5)
-
-    size_btn = ttk.Button(main_frame, text="Set Size", command=confirm_size)
-    size_btn.grid(row=1, column=0, padx=5, pady=5)
+    submit_button = tk.Button(gui, text="Submit", command=submit_input_matrix)
+    submit_button.grid(row=num_rows, columnspan=num_columns, pady=10)
 
     gui.mainloop()
 
-    return matrix
-
+    return input_matrix
 
 def choose_representation():
-    global representation_choice
+    def submit_choice():
+        nonlocal representation_choice
+        representation_choice = var.get()
+        gui.destroy()
+
+    representation_choice = None
     gui = tk.Tk()
     gui.title("Select Representation")
 
-    representation = tk.StringVar(value="unipolar")
+    var = tk.StringVar(value="unipolar")
 
-    def submit_representation():
-        global representation_choice
-        representation_choice = representation.get()
-        gui.destroy()
-
-    ttk.Label(gui, text="Choose input representation:").grid(column=0, row=0, padx=10, pady=10)
-
-    ttk.Radiobutton(gui, text="Unipolar", variable=representation, value="unipolar").grid(column=0, row=1, padx=10,
-                                                                                          pady=5)
-    ttk.Radiobutton(gui, text="Bipolar", variable=representation, value="bipolar").grid(column=0, row=2, padx=10,
-                                                                                        pady=5)
-
-    ttk.Button(gui, text="Submit", command=submit_representation).grid(column=0, row=3, padx=10, pady=10)
+    tk.Label(gui, text="Choose input representation:").pack(pady=10)
+    tk.Radiobutton(gui, text="Unipolar", variable=var, value="unipolar").pack(anchor=tk.W)
+    tk.Radiobutton(gui, text="Bipolar", variable=var, value="bipolar").pack(anchor=tk.W)
+    tk.Button(gui, text="Submit", command=submit_choice).pack(pady=10)
 
     gui.mainloop()
+
     return representation_choice
 
-
 def choose_input_method():
-    global input_method_choice
+    def submit_choice():
+        nonlocal input_method_choice
+        input_method_choice = var.get()
+        gui.destroy()
+
+    input_method_choice = None
     gui = tk.Tk()
     gui.title("Select Input Method")
 
-    method = tk.StringVar(value="gui")
+    var = tk.StringVar(value="gui")
 
-    def submit_method():
-        global input_method_choice
-        input_method_choice = method.get()
-        gui.destroy()
-
-    ttk.Label(gui, text="Choose input method:").grid(column=0, row=0, padx=10, pady=10)
-
-    ttk.Radiobutton(gui, text="GUI", variable=method, value="gui").grid(column=0, row=1, padx=10, pady=5)
-    ttk.Radiobutton(gui, text="File", variable=method, value="file").grid(column=0, row=2, padx=10, pady=5)
-
-    ttk.Button(gui, text="Submit", command=submit_method).grid(column=0, row=3, padx=10, pady=10)
+    tk.Label(gui, text="Choose input method:").pack(pady=10)
+    tk.Radiobutton(gui, text="GUI", variable=var, value="gui").pack(anchor=tk.W)
+    tk.Radiobutton(gui, text="File", variable=var, value="file").pack(anchor=tk.W)
+    tk.Button(gui, text="Submit", command=submit_choice).pack(pady=10)
 
     gui.mainloop()
+
     return input_method_choice
 
+def get_vector_and_matrix_size():
+    def submit_choice():
+        nonlocal num_columns, num_rows
+        try:
+            num_columns = int(entry_columns.get())
+            num_rows = int(entry_rows.get())
+            gui.destroy()
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid integer values.")
 
-def choose_test_pattern(input_size):
-    input_rows = simpledialog.askinteger("Test Pattern Entry", "How many rows for the test pattern?")
-    if input_rows:
-        input_vector = []
-        for i in range(input_rows):
-            row = simpledialog.askstring("Pattern Row Entry", f"Enter values for row {i + 1} (space-separated): ")
-            if row:
-                row = [int(x) if x.isdigit() else int(x) if x == '-1' else -1 for x in row.replace(",", "").split()]
-                if len(row) == input_size:
-                    input_vector.append(row)
-                else:
-                    messagebox.showerror("Error", f"Each row must be {input_size} values long.")
-                    return None
-            else:
-                return None
-        return input_vector
-    return None
+    num_columns, num_rows = None, None
 
-
-def continue_testing():
-    global continue_choice
     gui = tk.Tk()
-    gui.title("Continue Testing?")
+    gui.title("Matrix Size Input")
 
-    continue_var = tk.StringVar(value="yes")
+    tk.Label(gui, text="Enter length of the vector (number of columns):").grid(row=0, column=0, padx=10, pady=10)
+    entry_columns = tk.Entry(gui)
+    entry_columns.grid(row=0, column=1, padx=10, pady=10)
 
-    def submit_continue():
-        global continue_choice
-        continue_choice = (continue_var.get() == "yes")
-        gui.destroy()
+    tk.Label(gui, text="Enter number of rows:").grid(row=1, column=0, padx=10, pady=10)
+    entry_rows = tk.Entry(gui)
+    entry_rows.grid(row=1, column=1, padx=10, pady=10)
 
-    ttk.Label(gui, text="Do you want to continue testing?").grid(column=0, row=0, padx=10, pady=10)
-
-    ttk.Radiobutton(gui, text="Yes", variable=continue_var, value="yes").grid(column=0, row=1, padx=10, pady=5)
-    ttk.Radiobutton(gui, text="No", variable=continue_var, value="no").grid(column=0, row=2, padx=10, pady=5)
-
-    ttk.Button(gui, text="Submit", command=submit_continue).grid(column=0, row=3, padx=10, pady=10)
+    submit_button = tk.Button(gui, text="Submit", command=submit_choice)
+    submit_button.grid(row=2, columnspan=2, pady=10)
 
     gui.mainloop()
-    return continue_choice
 
+    return num_columns, num_rows
+
+def choose_test_pattern(input_size):
+    input_vector = simpledialog.askstring("Test Pattern", f"Enter test pattern of size {input_size}: ")
+    if input_vector:
+        input_vector = [int(x) if x.isdigit() else int(x) if x == '-1' else -1 for x in input_vector.replace(",", "").split()]
+        if len(input_vector) == input_size:
+            return input_vector
+        else:
+            messagebox.showerror("Error", f"Pattern length must be {input_size}.")
+    return None
+
+def continue_testing():
+    def submit_choice():
+        nonlocal continue_choice
+        continue_choice = var.get() == "yes"
+        gui.destroy()
+
+    continue_choice = None
+    gui = tk.Tk()
+    gui.title("Continue Testing")
+
+    var = tk.StringVar(value="yes")
+
+    tk.Label(gui, text="Do you want to continue testing?").pack(pady=10)
+    tk.Radiobutton(gui, text="Yes", variable=var, value="yes").pack(anchor=tk.W)
+    tk.Radiobutton(gui, text="No", variable=var, value="no").pack(anchor=tk.W)
+    tk.Button(gui, text="Submit", command=submit_choice).pack(pady=10)
+
+    gui.mainloop()
+
+    return continue_choice
 
 if __name__ == "__main__":
     representation = choose_representation()
     input_method = choose_input_method()
 
-    ham = HAM()
+    ham = HopfieldAssociativeMemory()
 
     if input_method == 'file':
-        file_path = filedialog.askopenfilename(title="Choose input file", filetypes=[("Text files", "*.txt")])
+        file_path = filedialog.askopenfilename(title="Select input file", filetypes=[("Text files", "*.txt")])
         input_patterns = read_input_from_file(file_path, representation)
-        ham.train(input_patterns)
+        if input_patterns:
+            ham.train(input_patterns)
     elif input_method == 'gui':
-        input_size = simpledialog.askinteger("Pattern Size", "Enter the size of the input pattern: ")
-        input_patterns = read_input_from_gui(input_size, representation)
-        ham.train(input_patterns)
+        num_columns, num_rows = get_vector_and_matrix_size()
+        input_patterns = read_input_from_gui(num_columns, num_rows, representation)
+        if input_patterns:
+            ham.train(input_patterns)
     else:
-        messagebox.showerror("Error", "Invalid input method. Please choose 'gui' or 'file'.")
+        messagebox.showerror("Error", "Invalid input method selected. Please choose 'gui' or 'file'.")
 
     while True:
         test_pattern = choose_test_pattern(len(input_patterns[0]))
         if test_pattern:
             output, energy = ham.recall(test_pattern)
-            messagebox.showinfo("Network Output", f"Response: {output}\nEnergy: {energy}")
+            messagebox.showinfo("Output", f"Network Response: {output}\nEnergy: {energy}")
         else:
             break
 
